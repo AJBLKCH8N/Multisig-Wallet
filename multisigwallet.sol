@@ -29,22 +29,22 @@ function removeOwner(address Owner) public{
 
 
 function deposit () public payable returns(uint) {
-    address(this).balance += msg.value;
-    //deposit amount to the contract
-
-}
-
-function withdrawl () public {
+    //Empty function to deposit amount to the contract - this allows anyone to deposit funds
+    //In solidity you dont need to specify address(this).balance to receive funds directly to the contract. 
+    //As long as a function is payable and you do not specify what to do with msg.value, 
+    //all funds will directly go into the contract internal balance.
+    //FUTURE: Can include some error handling to require that the sender's balance is greater/equal to sending amount
 
 }
 
 function getBalance() public view returns(uint) {
+    //simple function to get the balance of the contract, which anyone can execute
     return address(this).balance;
 
 }
 
 
-function approval(int nApprovals) public view returns() {
+function approval(int nApprovals) public view {
     if (nApprovals == approvals){
     }
     else {
@@ -53,11 +53,10 @@ function approval(int nApprovals) public view returns() {
 //check if there are enough approvals
 }
 
-function transfer(address to, uint amount) public {
-
-
-
-
+function transfer(address to, uint amount) public payable {
+    //simple function to transfer amount from the contract to an Ethereum wallet
+    //Future: add logic for approvals
+    payable(to).transfer(amount);
 }
 
 
