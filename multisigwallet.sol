@@ -8,7 +8,7 @@ address[] public owners;
 //this is an array called 'owner' of variable 'address' 
 
 uint limit;
-//uint called limit which is a flag to set the amount of approvals required
+//uint called limit which is a flag to set the amount of approvals and number of owners required
 
 struct Transfer{
     address transferTo;
@@ -20,7 +20,15 @@ struct Transfer{
 //declared at the global context scope and therefore used within the contract
 
 Transfer[] transferRequests;
-//array called transfer which is filled up with transferRequests which is created by the struct
+//array called transferRequests which is filled up with Transfer data structures which is created by the struct
+
+constructor() {
+    owners[0] = msg.sender;
+    //specifies the contract owner at at the beginning of contract deployment, and adds it to the owners array, position 1
+    //FUTURE - need to include provision to make it so that the contract owner cant be deleted from the array
+    limit = 3;
+    //this sets the default limit of number of approvals as 3
+}
 
 mapping(address => mapping(uint => bool)) approvals;
 //double mapping - set address to point to a mapping where you input ID of address, and it returns T/F
@@ -29,10 +37,11 @@ mapping(address => mapping(uint => bool)) approvals;
 //i.e. approvals {uint: bool}
 
 function addOwner(address _newOwner) public returns(address[] memory) {
-    //function to add owners to the owner array (currently no access control to limit who can add owners)
+    //function to add owners to the owner array (currently no access control to limit who can add owners
     owners.push(_newOwner);
     //this adds the _newOwner variable to the owners array
     //FUTURE - atm anyone can add owners. this needs to be limited to only specified people or perhaps only the contract owner
+    //FUTURE - include provisions to check the specified limit?
     return owners;
 }
 
@@ -49,6 +58,7 @@ function removeOwner(uint index) public returns(address[] memory) {
     //increments the index, going through to removve the specifed index corresponding to the owner
     owners.pop();
     //this removes the last item in the array
+    //include provisions that make it so that the contract owner cannot be removed from array position 0.
     return(owners);
 }
 
@@ -70,10 +80,13 @@ function getBalance() public view returns(uint) {
 
 
 function approval(int nApprovals) public view {
-    if (nApprovals == approvals){
-    }
-    else {
-    }
+    
+    
+    
+    //if (nApprovals == approvals){
+    //}
+    //else {
+    //}
 
 //check if there are enough approvals
 }
