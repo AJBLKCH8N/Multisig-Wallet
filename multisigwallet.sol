@@ -5,7 +5,7 @@ pragma abicoder v2;
 contract multisigwallet {
     address[] public owners;
     //this is an array called 'owner' of variable 'address' 
-    uint limit;
+    uint public limit;
     //uint called limit which is a flag to set the amount of approvals and number of owners required
     struct Transfer{
         address transferTo;
@@ -85,7 +85,7 @@ contract multisigwallet {
         //for testing purposes to see if transferRequests are being populated
         return transferRequests;
     }
-    function approval(uint _txIndex) public {  
+    function approveTransaction(uint _txIndex) public {  
         //the approval function is called by owners to give their approval of the submitted transaction.
         Transfer storage transaction = transferRequests[_txIndex];
         //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
@@ -93,11 +93,19 @@ contract multisigwallet {
         //sets the txnApproved bool to true
         transaction.numberApprovals += 1;
         //increments the number of approvals for the transaction
-
+        //at the moment the same address can approve multiple times. Need to restrict this
+        //if (transaction.numberApprovals >= limit) {
+            //include require txn.executed = false
+            //transaction.executed = true;
+        //}
     }
-    function transfer(address to, uint amount) public payable {
+    function executeTransfer(uint _txIndex) public payable {
         //simple function to transfer amount from the contract to an Ethereum wallet
         //Future: add logic for approvals
-        payable(to).transfer(amount);
+        //require numberApprovals >= limit
+        //require transaction.executed = false
+        Transfer storage transaction = transferRequests[_txIndex];
+        payable(transaction.transferTo).transfer(transaction.transferAmount);
+        transaction.executed = true;
     }
 }
