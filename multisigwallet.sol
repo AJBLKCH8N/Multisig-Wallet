@@ -3,45 +3,60 @@ pragma solidity 0.8.15;
 pragma abicoder v2;
 
 contract multisigwallet {
+    //contractOwner
+    address public contractOwner;
+    //array of addresses who are co-owners and are able to approve/suggest transactions
     address[] public owners;
-    //this is an array called 'owner' of variable 'address' 
+    //limit will be a variable to set the initial number of owners allowed in the array
     uint public limit;
-    //uint called limit which is a flag to set the amount of approvals and number of owners required
+    //mapping to keep track of whether an owner exists within owners group
+    mapping(address => bool) ownersMember;
+    //a Struct called transfer, which is a block of data pertaining to each transaction
     struct Transfer{
         address transferTo;
         uint transferAmount;
+        //executed variable to track whether the transaction has actually been executed
         bool executed;
-        //mapping(address => bool) txnApproved;
+        //number of approvals to track how many owners have approved the transaction
         uint8 numberApprovals;
     }
-    //struct = datastructure.
-    // this is a datastructure called 'Transfer' which contains address (transferTo, uint transferAmount and uint8 numberApprovals)
-    //declared at the global context scope and therefore used within the contract
+    //an array called transferRequests for the Transfer struct
     Transfer[] transferRequests;
-    //array called transferRequests which is filled up with Transfer data structures which is created by the struct
+    //Constructor set to push the contract owner as position 1 within the owners array & set the default limit as 3
     constructor() {
+        contractOwner = msg.sender;
         owners.push(msg.sender);
-        //specifies the contract owner at at the beginning of contract deployment, and adds it to the owners array, position 1
-        //FUTURE - need to include provision to make it so that the contract owner cant be deleted from the array
+        ownersMember[msg.sender] = true;
         limit = 3;
-        //this sets the default limit of number of approvals as 3
+        //FUTURE - need to include provision to make it so that the contract owner cant be deleted from the array
     }
+    //onlyOwner modifier for access control - contract owner specific restrictions
+    modifier onlyContractOwner {
+        require(msg.sender == contractOwner, "Only the contract owner can execute this function"); 
+        _;
+    }
+    //onlyOwners modifier for access control - restrictions limited to only those added to the owner array
+    modifier onlyOwners {
+        require(ownersMember[msg.sender], "Only owners added to the owners group execute this function"); 
+        _;
+    }
+    
     //mapping(address => mapping(uint => bool)) approvals;
     //double mapping - set address to point to a mapping where you input ID of address, and it returns T/F
     //mapping[msg.sender][transferID] => True/False
     // this is a mapping called 'approvals' that maps an address to an address ID which is mapped to a boolean Y/N
     //i.e. approvals {uint: bool}
-    function addOwner(address _newOwner) public returns(address[] memory) {
-        //function to add owners to the owner array (currently no access control to limit who can add owners
+    function addOwner(address _newOwner) public onlyContractOwner returns(address[] memory) {
+        //function to add owners to the owner array (currently no access control to limit who can add owners - onlyOwners or onlyOwner
         owners.push(_newOwner);
         //this adds the _newOwner variable to the owners array
+        ownersMember[_newOwner] = true;
         //FUTURE - atm anyone can add owners. this needs to be limited to only specified people or perhaps only the contract owner
         //FUTURE - include provisions to check the specified limit?
         return owners;
     }
-    function removeOwner(uint index) public returns(address[] memory) {
-    // need a way to remove a particular owner... Cant do this without leaving a 'gap', so will need to move all items in the array
-    // to the left, and remove the gap item 
+    function removeOwner(uint index) public onlyContractOwner returns(address[] memory) {
+        //function to remove an owner from the array
         if (index >= owners.length) return(owners);
         // if the index is greater than the length of the owners array, then the function comes to an end
         //FUTURE - change this if statement to a REQUIRE instead
@@ -66,7 +81,7 @@ contract multisigwallet {
         //simple function to get the balance of the contract, which anyone can execute
         return address(this).balance;
     }
-    function submitTransferRequest(address _transferTo, uint _transferAmount) public {
+    function submitTransferRequest(address _transferTo, uint _transferAmount) public onlyOwners {
         //this function submits the transfer request, populating the Transfer Struct.
         uint txIndex = transferRequests.length;
         transferRequests.push(
@@ -85,7 +100,7 @@ contract multisigwallet {
         //for testing purposes to see if transferRequests are being populated
         return transferRequests;
     }
-    function approveTransaction(uint _txIndex) public {  
+    function approveTransaction(uint _txIndex) public onlyOwners {  
         //the approval function is called by owners to give their approval of the submitted transaction.
         Transfer storage transaction = transferRequests[_txIndex];
         //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
@@ -99,12 +114,10 @@ contract multisigwallet {
             //transaction.executed = true;
         //}
     }
-    function executeTransfer(uint _txIndex) public payable {
-        //simple function to transfer amount from the contract to an Ethereum wallet
-        //Future: add logic for approvals
-        //require numberApprovals >= limit
-        //require transaction.executed = false
+    function executeTransfer(uint _txIndex) public payable onlyContractOwner {
+        //locks down this function to just the contract owner
         Transfer storage transaction = transferRequests[_txIndex];
+        require(transaction.executed = false, "this transaction has already been executed");
         payable(transaction.transferTo).transfer(transaction.transferAmount);
         transaction.executed = true;
     }
