@@ -37,10 +37,9 @@ contract multisigwallet {
     }
     //onlyOwners modifier for access control - restrictions limited to only those added to the owner array
     modifier onlyOwners {
-        require(ownersMember[msg.sender], "Only owners added to the owners group execute this function"); 
+        require(ownersMember[msg.sender] == true, "Only owners added to the owners group execute this function"); 
         _;
     }
-    
     //mapping(address => mapping(uint => bool)) approvals;
     //double mapping - set address to point to a mapping where you input ID of address, and it returns T/F
     //mapping[msg.sender][transferID] => True/False
@@ -60,6 +59,8 @@ contract multisigwallet {
         if (index >= owners.length) return(owners);
         // if the index is greater than the length of the owners array, then the function comes to an end
         //FUTURE - change this if statement to a REQUIRE instead
+        address addrHolder = owners[index]; 
+        ownersMember[addrHolder] = false;
         for (uint i = index; i < owners.length - 1; i++) {
             owners[i] = owners[i+1];
         } delete owners[owners.length-1];
@@ -68,9 +69,9 @@ contract multisigwallet {
         owners.pop();
         //this removes the last item in the array
         //include provisions that make it so that the contract owner cannot be removed from array position 0.
-        return(owners);
+        return owners;
     }
-    function deposit () public payable returns(uint) {
+    function deposit() public payable returns(uint) {
         //Empty function to deposit amount to the contract - this allows anyone to deposit funds
         //In solidity you dont need to specify address(this).balance to receive funds directly to the contract. 
         //As long as a function is payable and you do not specify what to do with msg.value, 
@@ -103,21 +104,19 @@ contract multisigwallet {
     function approveTransaction(uint _txIndex) public onlyOwners {  
         //the approval function is called by owners to give their approval of the submitted transaction.
         Transfer storage transaction = transferRequests[_txIndex];
+        require(transaction.executed == false, "this transaction has already been executed");
         //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
         //transaction.txnApproved[msg.sender] = true;
         //sets the txnApproved bool to true
         transaction.numberApprovals += 1;
         //increments the number of approvals for the transaction
         //at the moment the same address can approve multiple times. Need to restrict this
-        //if (transaction.numberApprovals >= limit) {
-            //include require txn.executed = false
-            //transaction.executed = true;
-        //}
     }
     function executeTransfer(uint _txIndex) public payable onlyContractOwner {
         //locks down this function to just the contract owner
         Transfer storage transaction = transferRequests[_txIndex];
-        require(transaction.executed = false, "this transaction has already been executed");
+        require(transaction.numberApprovals >= limit -1, "this transaction does not have enough approvals");
+        require(transaction.executed == false, "this transaction has already been executed");
         payable(transaction.transferTo).transfer(transaction.transferAmount);
         transaction.executed = true;
     }
