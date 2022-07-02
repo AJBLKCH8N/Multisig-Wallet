@@ -12,3 +12,5 @@ Example- input 3x addresses and set the approval limit to 2
 3) Any of the owners should be able to create a transfer request. The creator of the transfer request will specify what amount and to what address the transfer will be made
 4) Owners should be able to approve transfer requests
 5) When the transfer request has the required approvals, the transfer should be sent
+
+Planning:
