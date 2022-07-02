@@ -3,54 +3,73 @@ pragma solidity 0.8.15;
 pragma abicoder v2;
 
 contract multisigwallet {
-    //contractOwner
+    //MultiSigWallet Contract
     address public contractOwner;
-    //array of addresses who are co-owners and are able to approve/suggest transactions
+    //contractOwner
     address[] public owners;
-    //limit will be a variable to set the initial number of owners allowed in the array
+    //array of addresses who are co-owners and are able to approve/suggest transactions
     uint public limit;
-    //mapping to keep track of whether an owner exists within owners group
+    //limit will be a variable to set the initial number of owners allowed in the array
     mapping(address => bool) ownersMember;
-    //a Struct called transfer, which is a block of data pertaining to each transaction
+    //mapping to keep track of whether an owner exists within owners group
+    mapping(uint => mapping(address => bool)) approvalRecord;
+    //double mapping that maps an Index (TXN INDEX) to an address which is mapped to a boolean. to keep track of an address approving a txn.
+    
     struct Transfer{
         address transferTo;
+        //the recipient's address
         uint transferAmount;
-        //executed variable to track whether the transaction has actually been executed
+        //the amount to be transfered
         bool executed;
-        //number of approvals to track how many owners have approved the transaction
+        //executed variable to track whether the transaction has actually been executed
         uint8 numberApprovals;
+        //number of approvals to track how many owners have approved the transaction 
+
     }
-    //an array called transferRequests for the Transfer struct
+    //a Struct called transfer, which is a block of data pertaining to each transaction
+    
+    
+
     Transfer[] transferRequests;
-    //Constructor set to push the contract owner as position 1 within the owners array & set the default limit as 3
+    //an array called transferRequests for the Transfer struct
+    
     constructor() {
         contractOwner = msg.sender;
+        //sets the contractOwner as the address that deployed the contract
         owners.push(msg.sender);
+        //populate the 'owners' array with contract owner in the first position
         ownersMember[msg.sender] = true;
+        //sets the contract owner as the Owners Member
         limit = 3;
-        //FUTURE - need to include provision to make it so that the contract owner cant be deleted from the array
+        //Default limit to number of owners
     }
-    //onlyOwner modifier for access control - contract owner specific restrictions
+    //Constructor set to push the contract owner as position 1 within the owners array & set the default limit as 3
+    
     modifier onlyContractOwner {
         require(msg.sender == contractOwner, "Only the contract owner can execute this function"); 
         _;
     }
-    //onlyOwners modifier for access control - restrictions limited to only those added to the owner array
+    //onlyOwner modifier for access control - contract owner specific restrictions
+    
     modifier onlyOwners {
         require(ownersMember[msg.sender] == true, "Only owners added to the owners group execute this function"); 
         _;
     }
+    //onlyOwners modifier for access control - restrictions limited to only those added to the owner 
+    
+    modifier addrApproved(uint _txIndex) {
+        require(!approvalRecord[_txIndex][msg.sender], "Only owners added to the owners group execute this function"); 
+        _;
+    }
+    //onlyOwners modifier for access control - restrictions limited to only those added to the owner array
+
+    
     //mapping(address => mapping(uint => bool)) approvals;
-    //double mapping - set address to point to a mapping where you input ID of address, and it returns T/F
-    //mapping[msg.sender][transferID] => True/False
-    // this is a mapping called 'approvals' that maps an address to an address ID which is mapped to a boolean Y/N
-    //i.e. approvals {uint: bool}
     function addOwner(address _newOwner) public onlyContractOwner returns(address[] memory) {
-        //function to add owners to the owner array (currently no access control to limit who can add owners - onlyOwners or onlyOwner
+        //function to add owners to the owner array - locked down to only the contract owner
         owners.push(_newOwner);
         //this adds the _newOwner variable to the owners array
         ownersMember[_newOwner] = true;
-        //FUTURE - atm anyone can add owners. this needs to be limited to only specified people or perhaps only the contract owner
         //FUTURE - include provisions to check the specified limit?
         return owners;
     }
@@ -58,9 +77,10 @@ contract multisigwallet {
         //function to remove an owner from the array
         if (index >= owners.length) return(owners);
         // if the index is greater than the length of the owners array, then the function comes to an end
-        //FUTURE - change this if statement to a REQUIRE instead
         address addrHolder = owners[index]; 
+        //declares addrHolders as owners[index], as this cannot be executed within the for loop
         ownersMember[addrHolder] = false;
+        //this sets the address mapping to the OwnersMember group as false, effectively removing the addr from the priviledged group
         for (uint i = index; i < owners.length - 1; i++) {
             owners[i] = owners[i+1];
         } delete owners[owners.length-1];
@@ -73,10 +93,6 @@ contract multisigwallet {
     }
     function deposit() public payable returns(uint) {
         //Empty function to deposit amount to the contract - this allows anyone to deposit funds
-        //In solidity you dont need to specify address(this).balance to receive funds directly to the contract. 
-        //As long as a function is payable and you do not specify what to do with msg.value, 
-        //all funds will directly go into the contract internal balance.
-        //FUTURE: Can include some error handling to require that the sender's balance is greater/equal to sending amount
     }
     function getBalance() public view returns(uint) {
         //simple function to get the balance of the contract, which anyone can execute
@@ -96,28 +112,36 @@ contract multisigwallet {
                 }
             )
         );
+        //this populates the inputs into the Transfer Struct and pushes it to the 'Queue' awaiting approvals from the owners
     }
     function getTransferRequests() external view returns(Transfer[] memory) {
         //for testing purposes to see if transferRequests are being populated
         return transferRequests;
     }
-    function approveTransaction(uint _txIndex) public onlyOwners {  
+    function approveTransaction(uint _txIndex) public onlyOwners addrApproved(_txIndex){  
         //the approval function is called by owners to give their approval of the submitted transaction.
         Transfer storage transaction = transferRequests[_txIndex];
-        require(transaction.executed == false, "this transaction has already been executed");
         //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
-        //transaction.txnApproved[msg.sender] = true;
-        //sets the txnApproved bool to true
+        require(transaction.executed == false, "this transaction has already been executed");
+        //this requires that the transaction has not already been executed
+        approvalRecord[_txIndex][msg.sender] = true;
+        //this sets the approval record corresponding to the txn ID and the caller address to true to ensure they cant confirm twice.
         transaction.numberApprovals += 1;
         //increments the number of approvals for the transaction
-        //at the moment the same address can approve multiple times. Need to restrict this
+
     }
     function executeTransfer(uint _txIndex) public payable onlyContractOwner {
         //locks down this function to just the contract owner
         Transfer storage transaction = transferRequests[_txIndex];
         require(transaction.numberApprovals >= limit -1, "this transaction does not have enough approvals");
+        //Requires that the transaction has enough approvals (which is one less than the limit) - probably need to rethink this
         require(transaction.executed == false, "this transaction has already been executed");
+        //Requires that the transacton.executed flag is false - stops a transaction being executed twice
+        require(address(this).balance >= transaction.transferAmount, "this transaction cannot be executed, insufficient balance");
+        //requires that the contract balance is greater than the transfer amount - is this even needed?
         payable(transaction.transferTo).transfer(transaction.transferAmount);
+        //Executes the transaction, sending amount to the recipient
         transaction.executed = true;
+        //Once the transaction has been executed, it sets the transaction executed flag to true.
     }
 }
