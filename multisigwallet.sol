@@ -1,4 +1,4 @@
-//SPDX-License-Identifier:UNLICENSED
+ //SPDX-License-Identifier:UNLICENSED
 pragma solidity 0.8.15;
 pragma abicoder v2;
 
@@ -58,14 +58,35 @@ contract multisigwallet {
     //onlyOwners modifier for access control - restrictions limited to only those added to the owner 
     
     modifier addrApproved(uint _txIndex) {
-        require(!approvalRecord[_txIndex][msg.sender], "Only owners added to the owners group execute this function"); 
+        require(!approvalRecord[_txIndex][msg.sender], "You have already approved this transfer"); 
         _;
     }
-    //onlyOwners modifier for access control - restrictions limited to only those added to the owner array
+    //addrApproved modidier that ensures that the address is only able to approve a transaction once
 
+    modifier transferExecuted(uint _txIndex) {
+        require(!transferRequests[_txIndex].executed, "This transfer has already been executed"); 
+        _;
+    }
+    //transferExecuted modifier that ensures that an executed transfer request cannot be executed twice
+
+    modifier minApprovals(uint _txIndex) {
+        require(transferRequests[_txIndex].numberApprovals >= (limit / 2), "minimum number of approvals for this transaction has not been met");
+        _;
+    }
+    //minApprovals modifier that makes sure that the minimum number of approvals for the transaction has been met
+
+    modifier minBalance(uint _txIndex) {
+        require(address(this).balance >= transferRequests[_txIndex].transferAmount, "Insufficient balance to execute this transaction");
+        _;
+    }
+
+    modifier maxOwners() {
+        require(owners.length + 1 <= limit , "Cannot add new owners, Maximum number of owners reached");
+        _;
+    }
     
     //mapping(address => mapping(uint => bool)) approvals;
-    function addOwner(address _newOwner) public onlyContractOwner returns(address[] memory) {
+    function addOwner(address _newOwner) public onlyContractOwner maxOwners returns(address[] memory) {
         //function to add owners to the owner array - locked down to only the contract owner
         owners.push(_newOwner);
         //this adds the _newOwner variable to the owners array
@@ -98,6 +119,11 @@ contract multisigwallet {
         //simple function to get the balance of the contract, which anyone can execute
         return address(this).balance;
     }
+    function changeLimit(uint _newLimit) public onlyContractOwner returns(uint) {
+        //simple function to change owners limit
+        limit = _newLimit;
+        return limit;
+    }
     function submitTransferRequest(address _transferTo, uint _transferAmount) public onlyOwners {
         //this function submits the transfer request, populating the Transfer Struct.
         uint txIndex = transferRequests.length;
@@ -118,27 +144,20 @@ contract multisigwallet {
         //for testing purposes to see if transferRequests are being populated
         return transferRequests;
     }
-    function approveTransaction(uint _txIndex) public onlyOwners addrApproved(_txIndex){  
+    function approveTransaction(uint _txIndex) public onlyOwners addrApproved(_txIndex) transferExecuted(_txIndex){  
         //the approval function is called by owners to give their approval of the submitted transaction.
         Transfer storage transaction = transferRequests[_txIndex];
         //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
-        require(transaction.executed == false, "this transaction has already been executed");
-        //this requires that the transaction has not already been executed
         approvalRecord[_txIndex][msg.sender] = true;
         //this sets the approval record corresponding to the txn ID and the caller address to true to ensure they cant confirm twice.
         transaction.numberApprovals += 1;
         //increments the number of approvals for the transaction
 
     }
-    function executeTransfer(uint _txIndex) public payable onlyContractOwner {
+    function executeTransfer(uint _txIndex) public payable onlyContractOwner transferExecuted(_txIndex) minBalance(_txIndex) minApprovals(_txIndex) {
         //locks down this function to just the contract owner
         Transfer storage transaction = transferRequests[_txIndex];
-        require(transaction.numberApprovals >= limit -1, "this transaction does not have enough approvals");
-        //Requires that the transaction has enough approvals (which is one less than the limit) - probably need to rethink this
-        require(transaction.executed == false, "this transaction has already been executed");
-        //Requires that the transacton.executed flag is false - stops a transaction being executed twice
-        require(address(this).balance >= transaction.transferAmount, "this transaction cannot be executed, insufficient balance");
-        //requires that the contract balance is greater than the transfer amount - is this even needed?
+        //declared a local variable, 'transaction' which is an ID/index of the transfer requests array
         payable(transaction.transferTo).transfer(transaction.transferAmount);
         //Executes the transaction, sending amount to the recipient
         transaction.executed = true;
