@@ -4,6 +4,8 @@ pragma abicoder v2;
 
 contract multisigwallet {
     //MultiSigWallet Contract
+    
+    //CONTRACT VARIABLES & DECLARATIONS
     address public contractOwner;
     //contractOwner
     address[] public owners;
@@ -14,7 +16,6 @@ contract multisigwallet {
     //mapping to keep track of whether an owner exists within owners group
     mapping(uint => mapping(address => bool)) approvalRecord;
     //double mapping that maps an Index (TXN INDEX) to an address which is mapped to a boolean. to keep track of an address approving a txn.
-    
     struct Transfer{
         address transferTo;
         //the recipient's address
@@ -27,12 +28,8 @@ contract multisigwallet {
 
     }
     //a Struct called transfer, which is a block of data pertaining to each transaction
-    
-    
-
     Transfer[] transferRequests;
     //an array called transferRequests for the Transfer struct
-    
     constructor() {
         contractOwner = msg.sender;
         //sets the contractOwner as the address that deployed the contract
@@ -43,55 +40,59 @@ contract multisigwallet {
         limit = 3;
         //Default limit to number of owners
     }
-    //Constructor set to push the contract owner as position 1 within the owners array & set the default limit as 3
+    //Constructor to initalise on contract deployment to set to push the contract owner as position 1 within the owners array & set the default limit as 3
     
+
+    //CONTRACT MODIFIERS
     modifier onlyContractOwner {
         require(msg.sender == contractOwner, "Only the contract owner can execute this function"); 
         _;
     }
-    //onlyOwner modifier for access control - contract owner specific restrictions
-    
+    //onlyOwner modifier for access control - contract owner specific restrictions    
     modifier onlyOwners {
         require(ownersMember[msg.sender] == true, "Only owners added to the owners group execute this function"); 
         _;
     }
     //onlyOwners modifier for access control - restrictions limited to only those added to the owner 
-    
     modifier addrApproved(uint _txIndex) {
         require(!approvalRecord[_txIndex][msg.sender], "You have already approved this transfer"); 
         _;
     }
     //addrApproved modidier that ensures that the address is only able to approve a transaction once
-
     modifier transferExecuted(uint _txIndex) {
         require(!transferRequests[_txIndex].executed, "This transfer has already been executed"); 
         _;
     }
     //transferExecuted modifier that ensures that an executed transfer request cannot be executed twice
-
     modifier minApprovals(uint _txIndex) {
         require(transferRequests[_txIndex].numberApprovals >= (limit / 2), "minimum number of approvals for this transaction has not been met");
         _;
     }
     //minApprovals modifier that makes sure that the minimum number of approvals for the transaction has been met
-
     modifier minBalance(uint _txIndex) {
         require(address(this).balance >= transferRequests[_txIndex].transferAmount, "Insufficient balance to execute this transaction");
         _;
     }
-
+    //minBalance modifier to ensure that there is sufficient balance within the contract to cover a transfer being executed
     modifier maxOwners() {
         require(owners.length + 1 <= limit , "Cannot add new owners, Maximum number of owners reached");
         _;
     }
+    //maxOwners modifier to ensure that new owners cannot be added to the Owners Group if the number of owners exceeds the limit setting
+    modifier reduceLimit() {
+        require(limit >= owners.length + 1 , "Warning: Cannot Reduce Limit; Remove Owners from Owners Group First");
+        _;
+    }
+    //reduceLimit modifier to ensure that the limit cannot be reduced less than the number of owners in the owners group
     
-    //mapping(address => mapping(uint => bool)) approvals;
+
+    //CONTRACT FUNCTIONS
     function addOwner(address _newOwner) public onlyContractOwner maxOwners returns(address[] memory) {
         //function to add owners to the owner array - locked down to only the contract owner
         owners.push(_newOwner);
         //this adds the _newOwner variable to the owners array
         ownersMember[_newOwner] = true;
-        //FUTURE - include provisions to check the specified limit?
+        //This sets the new owners address boolean for Owners Members to true
         return owners;
     }
     function removeOwner(uint index) public onlyContractOwner returns(address[] memory) {
@@ -119,9 +120,10 @@ contract multisigwallet {
         //simple function to get the balance of the contract, which anyone can execute
         return address(this).balance;
     }
-    function changeLimit(uint _newLimit) public onlyContractOwner returns(uint) {
+    function changeLimit(uint _newLimit) public onlyContractOwner reduceLimit returns(uint) {
         //simple function to change owners limit
         limit = _newLimit;
+        //new limit as input
         return limit;
     }
     function submitTransferRequest(address _transferTo, uint _transferAmount) public onlyOwners {
